@@ -3072,7 +3072,7 @@ VK_LAYER_EXPORT VKAPI_ATTR PFN_vkVoidFunction VKAPI_CALL vk_layerGetPhysicalDevi
     return parameter_validation::vkGetPhysicalDeviceProcAddr(instance, funcName);
 }
 
-VK_LAYER_EXPORT bool pv_vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface *pVersionStruct) {
+VK_LAYER_EXPORT VkResult vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerInterface *pVersionStruct) {
     assert(pVersionStruct != NULL);
     assert(pVersionStruct->sType == LAYER_NEGOTIATE_INTERFACE_STRUCT);
 
@@ -3081,6 +3081,20 @@ VK_LAYER_EXPORT bool pv_vkNegotiateLoaderLayerInterfaceVersion(VkNegotiateLayerI
         pVersionStruct->pfnGetInstanceProcAddr = vkGetInstanceProcAddr;
         pVersionStruct->pfnGetDeviceProcAddr = vkGetDeviceProcAddr;
         pVersionStruct->pfnGetPhysicalDeviceProcAddr = vk_layerGetPhysicalDeviceProcAddr;
+    }
+
+    if (pVersionStruct->loaderLayerInterfaceVersion >= 3 && NULL != pVersionStruct->pNext) {
+        // If some additional structures have been added to the chain, figure out if we can use
+        // one or more of them.
+        VkNegotiateHeader *pNext = reinterpret_cast<VkNegotiateHeader *>(pVersionStruct->pNext);
+        while (NULL != pNext) {
+            // If this is a settings file info struct, grab the filename
+            if (pNext->sType == LAYER_NEGOTIATE_SETTINGS_FILE_INFO_STRUCT) {
+                VkLayerSettingsFileInfo *pSettingsInfo = reinterpret_cast<VkLayerSettingsFileInfo *>(pNext);
+                setOptionFilename(pSettingsInfo->settings_file);
+            }
+            pNext = reinterpret_cast<VkNegotiateHeader *>(pNext->pNext);
+        }
     }
 
     if (pVersionStruct->loaderLayerInterfaceVersion < CURRENT_LOADER_LAYER_INTERFACE_VERSION) {
